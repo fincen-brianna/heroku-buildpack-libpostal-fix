@@ -16,18 +16,21 @@ unsigned int lzf_decompress(const void *const in_data, unsigned int in_len, void
 #endif
 EOF
 export CPATH="/tmp/lzf_stub:${CPATH}"
-export buildinclude=/app/snappy/include
 
 echo "-----> Fetching and patching homelight compile script"
 curl -sf https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
   -o /tmp/hl_compile.sh
 
-# Fix 1: $buildinclude was empty, now set above but also patch for safety
-# Fix 2: script copies snappy headers from /app/vendor/include but snappy installs to /app/snappy/include
-sed -i 's|/app/vendor/include/snappy|/app/snappy/include/snappy|g' /tmp/hl_compile.sh
-sed -i 's|/app/vendor/lib/libsnappy|/app/snappy/lib/libsnappy|g' /tmp/hl_compile.sh
-sed -i 's|/app/vendor/include|/app/snappy/include|g' /tmp/hl_compile.sh
-sed -i 's|/app/vendor/lib|/app/snappy/lib|g' /tmp/hl_compile.sh
+echo "-----> Script variable assignments (pre-patch):"
+grep -n 'build=' /tmp/hl_compile.sh
+
+# Change the root build path from /app/vendor to /app/snappy
+sed -i 's|build=/app/vendor|build=/app/snappy|g' /tmp/hl_compile.sh
+# Also fix buildinclude if it's derived separately
+sed -i 's|buildinclude=/app/vendor|buildinclude=/app/snappy|g' /tmp/hl_compile.sh
+
+echo "-----> Script variable assignments (post-patch):"
+grep -n 'build=' /tmp/hl_compile.sh
 
 echo "-----> Running patched compile"
 bash /tmp/hl_compile.sh "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
