@@ -21,16 +21,11 @@ echo "-----> Fetching and patching homelight compile script"
 curl -sf https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
   -o /tmp/hl_compile.sh
 
-echo "-----> Script variable assignments (pre-patch):"
-grep -n 'build=' /tmp/hl_compile.sh
+# Fix 1: buildinclude is never set in the script, causing CFLAGS="-I" which breaks configure
+sed -i 's|CFLAGS="-I$buildinclude"|CFLAGS="-I/app/snappy/include"|g' /tmp/hl_compile.sh
 
-# Change the root build path from /app/vendor to /app/snappy
-sed -i 's|build=/app/vendor|build=/app/snappy|g' /tmp/hl_compile.sh
-# Also fix buildinclude if it's derived separately
-sed -i 's|buildinclude=/app/vendor|buildinclude=/app/snappy|g' /tmp/hl_compile.sh
-
-echo "-----> Script variable assignments (post-patch):"
-grep -n 'build=' /tmp/hl_compile.sh
+# Fix 2: copies snappy headers from ~/vendor/include which doesn't exist
+sed -i 's|cp ~/vendor/include/snappy\* \.|cp /app/snappy/include/snappy* .|g' /tmp/hl_compile.sh
 
 echo "-----> Running patched compile"
 bash /tmp/hl_compile.sh "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
