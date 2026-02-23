@@ -19,4 +19,8 @@ export CPATH="/tmp/lzf_stub:${CPATH}"
 
 echo "-----> Running homelight libpostal compile"
 curl -s https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
-  | bash -s "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
+  | bash -s "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR" || {
+    echo "-----> BUILD FAILED - dumping config.log"
+    find /tmp/codon/tmp/cache/libpostal -name config.log -exec cat {} \; 2>/dev/null || echo "config.log not found"
+    exit 1
+  }
