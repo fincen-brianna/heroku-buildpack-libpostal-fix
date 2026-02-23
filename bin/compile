@@ -5,7 +5,7 @@ BUILD_DIR=$1
 CACHE_DIR=$2
 ENV_DIR=$3
 
-echo "-----> Creating lzf.h stub (snappy test suite only)"
+echo "-----> Creating lzf.h stub"
 mkdir -p /tmp/lzf_stub
 cat > /tmp/lzf_stub/lzf.h <<'EOF'
 #ifndef LZF_H
@@ -17,10 +17,20 @@ unsigned int lzf_decompress(const void *const in_data, unsigned int in_len, void
 EOF
 export CPATH="/tmp/lzf_stub:${CPATH}"
 
-echo "-----> Running homelight libpostal compile"
-curl -s https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
-  | bash -s "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR" || {
-    echo "-----> BUILD FAILED - dumping config.log"
-    find /tmp/codon/tmp/cache/libpostal -name config.log -exec cat {} \; 2>/dev/null || echo "config.log not found"
-    exit 1
-  }
+echo "-----> Fetching homelight compile script"
+curl -sf https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
+  -o /tmp/hl_compile.sh
+chmod +x /tmp/hl_compile.sh
+
+echo "-----> Patching snappy CFLAGS (heroku-24 fix)"
+# On heroku-24, the variable the script uses for the snappy include path
+# evaluates to empty, producing CFLAGS="-I" which breaks configure.
+# Snappy installs to /app/snappy, so hardcode that path.
+sed -i 's|CFLAGS="-I\${[^}]*}/include"|CFLAGS="-I/app/snappy/include"|g' /tmp/hl_compile.sh
+sed -i 's|CFLAGS="-I\${[^}]*}|CFLAGS="-I/app/snappy/include|g' /tmp/hl_compile.sh
+
+echo "-----> Script after patch (CFLAGS line):"
+grep -n 'CFLAGS' /tmp/hl_compile.sh || echo "no CFLAGS line found"
+
+echo "-----> Running patched compile"
+bash /tmp/hl_compile.sh "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
