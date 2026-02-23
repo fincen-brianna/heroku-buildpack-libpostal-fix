@@ -3,12 +3,9 @@ set -eo pipefail
 
 BUILD_DIR=$1
 CACHE_DIR=$2
+ENV_DIR=$3
 
-mkdir -p "$BUILD_DIR" "$CACHE_DIR"
-
-# ── snappy ────────────────────────────────────────────────────────────────────
-echo "-----> Building snappy"
-
+echo "-----> Creating lzf.h stub"
 mkdir -p /tmp/lzf_stub
 cat > /tmp/lzf_stub/lzf.h <<'EOF'
 #ifndef LZF_H
@@ -20,40 +17,18 @@ unsigned int lzf_decompress(const void *const in_data, unsigned int in_len, void
 EOF
 export CPATH="/tmp/lzf_stub:${CPATH}"
 
-cd "$CACHE_DIR"
-wget -q https://codeload.github.com/google/snappy/tar.gz/1.1.3 -O snappy.tar.gz
-tar -zxf snappy.tar.gz
-cd snappy-1.1.3
-./autogen.sh
-./configure --prefix=/app/snappy
-make
-make install
-cd "$CACHE_DIR"
+echo "-----> Fetching and patching homelight compile script"
+curl -sf https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
+  -o /tmp/hl_compile.sh
 
-# ── libpostal ─────────────────────────────────────────────────────────────────
-echo "-----> Building libpostal"
+# Fix 1: buildinclude is never set, causing CFLAGS="-I" which breaks configure
+sed -i 's|CFLAGS="-I$buildinclude"|CFLAGS="-I/app/snappy/include"|g' /tmp/hl_compile.sh
 
-git clone https://github.com/openvenues/libpostal --depth 1
-cd libpostal
+# Fix 2: copies snappy headers from ~/vendor/include which doesn't exist
+sed -i 's|cp ~/vendor/include/snappy\* \.|cp /app/snappy/include/snappy* .|g' /tmp/hl_compile.sh
 
-./bootstrap.sh
+# Fix 3: test/test_string_utils.c references ../src/features.h which doesn't exist
+sed -i '/PKG_CONFIG_PATH.*\.\/configure/a sed -i "s/ test//" Makefile' /tmp/hl_compile.sh
 
-# Fix: libpostal's src/features.h defines _FEATURES_H, shadowing the system
-# /usr/include/features.h and leaving __GLIBC_USE undefined, which breaks all
-# glibc headers (stdlib.h, stdint.h, etc.) on glibc 2.35+
-mv src/features.h src/libpostal_features.h
-grep -rl '"features.h"' src/ | xargs sed -i 's|"features.h"|"libpostal_features.h"|g'
-
-# Fix: buildinclude was never set in the original script (CFLAGS="-I" broke configure)
-# Fix: cp ~/vendor/include/snappy* doesn't exist; snappy is at /app/snappy/include
-LDFLAGS="-L/app/snappy/lib" \
-CFLAGS="-I/app/snappy/include" \
-PKG_CONFIG_PATH="/app/snappy/lib/pkgconfig" \
-  ./configure --prefix=/app/libpostal --datadir="$BUILD_DIR"
-
-cp /app/snappy/include/snappy*.h src/
-
-make
-make install
-
-mv /app/snappy /app/libpostal "$BUILD_DIR"
+echo "-----> Running patched compile"
+bash /tmp/hl_compile.sh "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
