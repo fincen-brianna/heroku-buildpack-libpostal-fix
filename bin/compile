@@ -5,8 +5,13 @@ BUILD_DIR=$1
 CACHE_DIR=$2
 ENV_DIR=$3
 
-echo "-----> Installing liblzf-dev"
-apt-get install -y liblzf-dev 2>&1 | sed 's/^/       /'
+echo "-----> Fetching liblzf-dev (no root)"
+mkdir -p /tmp/liblzf
+curl -s "http://archive.ubuntu.com/ubuntu/pool/universe/l/liblzf/liblzf-dev_3.6-4_amd64.deb" \
+  -o /tmp/liblzf.deb
+dpkg-deb -x /tmp/liblzf.deb /tmp/liblzf
+export CPATH="/tmp/liblzf/usr/include:${CPATH}"
+export LIBRARY_PATH="/tmp/liblzf/usr/lib/x86_64-linux-gnu:${LIBRARY_PATH}"
 
 echo "-----> Running homelight libpostal compile"
 curl -s https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile \
