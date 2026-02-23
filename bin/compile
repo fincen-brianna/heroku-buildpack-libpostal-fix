@@ -1,0 +1,12 @@
+#!/bin/bash
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+# Fix: expose liblzf-dev headers installed by apt buildpack
+export CPATH="$BUILD_DIR/.apt/usr/include:$CPATH"
+export LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu:$LIBRARY_PATH"
+
+# Now run the real homelight compile
+curl -s https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/master/bin/compile | bash -s "$BUILD_DIR" "$CACHE_DIR" "$ENV_DIR"
