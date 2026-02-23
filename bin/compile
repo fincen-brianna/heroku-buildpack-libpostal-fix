@@ -24,8 +24,10 @@ curl -sf https://raw.githubusercontent.com/homelight/heroku-buildback-libpostal/
 # Fix 1: buildinclude is never set, causing CFLAGS="-I" which breaks configure
 sed -i 's|CFLAGS="-I$buildinclude"|CFLAGS="-I/app/snappy/include"|g' /tmp/hl_compile.sh
 
-# Fix 2: copies snappy headers from ~/vendor/include which doesn't exist
-sed -i 's|cp ~/vendor/include/snappy\* \.|cp /app/snappy/include/snappy* .|g' /tmp/hl_compile.sh
+# Fix 2: cp from ~/vendor/include doesn't exist AND copying snappy headers into the
+# libpostal source tree corrupts glibc macro resolution. Remove it entirely —
+# snappy is already on the include path via CFLAGS="-I/app/snappy/include"
+sed -i '/cp.*vendor.*snappy/d' /tmp/hl_compile.sh
 
 # Fix 3: test/test_string_utils.c references ../src/features.h which doesn't exist
 sed -i '/PKG_CONFIG_PATH.*\.\/configure/a sed -i "s/ test//" Makefile' /tmp/hl_compile.sh
